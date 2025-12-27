@@ -251,13 +251,6 @@
 #define HAS_FEATURE(FEATURE) 0
 #endif
 
-// Macro for telling -Wimplicit-fallthrough that a fallthrough is intentional.
-#if defined(__clang__)
-#define FALLTHROUGH [[clang::fallthrough]]
-#else
-#define FALLTHROUGH
-#endif
-
 #if defined(COMPILER_GCC)
 #define PRETTY_FUNCTION __PRETTY_FUNCTION__
 #elif defined(COMPILER_MSVC)
@@ -318,6 +311,30 @@
 #define STACK_UNINITIALIZED __attribute__((uninitialized))
 #else
 #define STACK_UNINITIALIZED
+#endif
+
+// Attribute "no_stack_protector" disables -fstack-protector for the specified
+// function.
+//
+// "stack_protector" is enabled on most POSIX builds. The flag adds a canary
+// to each stack frame, which on function return is checked against a reference
+// canary. If the canaries do not match, it's likely that a stack buffer
+// overflow has occurred, so immediately crashing will prevent exploitation in
+// many cases.
+//
+// In some cases it's desirable to remove this, e.g. on hot functions, or if
+// we have purposely changed the reference canary.
+//
+// On Linux systems the reference canary will be purposely changed when forking
+// sub-processes (see https://crbug.com/40181003). To avoid sub-process shutdown
+// crashes the NO_STACK_PROTECTOR annotation must be added to all functions in
+// the call stack leading to CefExecuteProcess(). Applications that cannot add
+// this annotation must instead pass the `--change-stack-guard-on-fork=disable`
+// command-line flag.
+#if defined(COMPILER_GCC) || defined(__clang__)
+#define NO_STACK_PROTECTOR __attribute__((no_stack_protector))
+#else
+#define NO_STACK_PROTECTOR
 #endif
 
 // The ANALYZER_ASSUME_TRUE(bool arg) macro adds compiler-specific hints
@@ -386,26 +403,4 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
 #endif
 
 #endif  // !USING_CHROMIUM_INCLUDES
-
-// Annotate a function indicating the caller must examine the return value.
-// Use like:
-//   int foo() WARN_UNUSED_RESULT;
-// To explicitly ignore a result, use std::ignore from <tuple>.
-// Alternately use `[[nodiscard]]` with code that supports C++17.
-#undef WARN_UNUSED_RESULT
-#if defined(COMPILER_GCC) || defined(__clang__)
-#define WARN_UNUSED_RESULT __attribute__((warn_unused_result))
-#else
-#define WARN_UNUSED_RESULT
-#endif
-
-// Annotate a variable indicating it's ok if the variable is not used.
-// (Typically used to silence a compiler warning when the assignment
-// is important for some other reason.)
-// Use like:
-//   int x = ...;
-//   ALLOW_UNUSED_LOCAL(x);
-// Alternately use `[[maybe_unused]]` with code that supports C++17.
-#define ALLOW_UNUSED_LOCAL(x) (void)x
-
 #endif  // CEF_INCLUDE_BASE_CEF_COMPILER_SPECIFIC_H_

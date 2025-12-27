@@ -98,6 +98,9 @@ public:
     virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefFrame> frame,
+#if defined(_WIN32)
+                               int popup_id,
+#endif
                                const CefString& target_url,
                                const CefString& target_frame_name,
                                WindowOpenDisposition target_disposition,

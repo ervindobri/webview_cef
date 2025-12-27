@@ -167,6 +167,9 @@ void WebviewHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 
 bool WebviewHandler::OnBeforePopup(CefRefPtr<CefBrowser> browser,
                                   CefRefPtr<CefFrame> frame,
+#if defined(_WIN32)
+                                  int popup_id,
+#endif
                                   const CefString& target_url,
                                   const CefString& target_frame_name,
                                   WindowOpenDisposition target_disposition,
@@ -580,13 +583,8 @@ void WebviewHandler::sendJavaScriptChannelCallBack(const bool error, const std::
 
         CefRefPtr<CefFrame> frame = bit->second.browser->GetMainFrame();
 
-        // Return types for frame->GetIdentifier() changed, use the Linux way when updating MacOS or Windows
-        // versions in download.cmake
-#if __linux__
+        // Return types for frame->GetIdentifier() - now returns CefString on newer CEF versions
         bool identifierMatch = std::stoll(frame->GetIdentifier().ToString()) == frameIdInt;
-#else
-        bool identifierMatch = frame->GetIdentifier() == frameIdInt;
-#endif
         if (identifierMatch)
         {
             frame->SendProcessMessage(PID_RENDERER, message);

@@ -9,12 +9,51 @@ set(PROJECT_NAME "webview_cef")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-message(STATUS "${CMAKE_BUILD_TYPE}")
+  message(STATUS "${CMAKE_BUILD_TYPE}")
 endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../third/download.cmake)
+
 # wait for unified version cef source code and prebuilt files
 prepare_prebuilt_files(${CMAKE_CURRENT_SOURCE_DIR}/../third/cef)
+
+# CEF configuration
+set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef")
+
+# Build libcef_dll_wrapper from source
+set(CEF_LIBCEF_DLL_WRAPPER_PATH "${CEF_ROOT}/libcef_dll")
+
+if(EXISTS "${CEF_LIBCEF_DLL_WRAPPER_PATH}")
+  message(STATUS "Building libcef_dll_wrapper from source at ${CEF_LIBCEF_DLL_WRAPPER_PATH}")
+
+  # Collect all wrapper source files
+  file(GLOB_RECURSE CEF_WRAPPER_SOURCES
+    "${CEF_LIBCEF_DLL_WRAPPER_PATH}/*.cc"
+    "${CEF_LIBCEF_DLL_WRAPPER_PATH}/*.cpp"
+  )
+
+  # Create the wrapper library
+  add_library(libcef_dll_wrapper STATIC ${CEF_WRAPPER_SOURCES})
+
+  # Set include directories for wrapper
+  target_include_directories(libcef_dll_wrapper PUBLIC "${CEF_ROOT}")
+  target_include_directories(libcef_dll_wrapper PUBLIC "${CEF_ROOT}/include")
+
+  # Wrapper compile definitions
+  target_compile_definitions(libcef_dll_wrapper PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+    WRAPPING_CEF_SHARED
+  )
+
+  # C++17 standard
+  set_target_properties(libcef_dll_wrapper PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+  )
+else()
+  message(WARNING "CEF wrapper source not found at ${CEF_LIBCEF_DLL_WRAPPER_PATH}")
+endif()
 
 # This value is used when generating builds using this plugin, so it must
 # not be changed
@@ -57,59 +96,63 @@ apply_standard_settings(${PLUGIN_NAME})
 # exported should be explicitly exported with the FLUTTER_PLUGIN_EXPORT macro.
 set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden)
-target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
+target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL NOMINMAX)
 
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third/cef)
+target_include_directories(${PLUGIN_NAME} PRIVATE "${CEF_ROOT}")
+target_include_directories(${PLUGIN_NAME} PRIVATE "${CEF_ROOT}/include")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
 
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
-debug ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/libcef.lib
-debug ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/libcef_dll_wrapper.lib
-optimized ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/libcef.lib
-optimized ${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/libcef_dll_wrapper.lib)
+# Link against CEF libraries
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
+
+# Link wrapper (built from source)
+if(TARGET libcef_dll_wrapper)
+  target_link_libraries(${PLUGIN_NAME} PRIVATE libcef_dll_wrapper)
+endif()
+
+# Link libcef.lib - Standard CEF distribution structure
+target_link_libraries(${PLUGIN_NAME} PRIVATE
+  debug "${CEF_ROOT}/Debug/libcef.lib"
+  optimized "${CEF_ROOT}/Release/libcef.lib"
+)
 
 # List of absolute paths to libraries that should be bundled with the plugin.
-# This list could contain prebuilt libraries, or libraries created by an
-# external build triggered from this build file.
+# Standard CEF distribution paths
 set(webview_cef_bundled_libraries
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/locales"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/icudtl.dat"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/resources.pak"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/chrome_100_percent.pak"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/resources/chrome_200_percent.pak"
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/chrome_elf.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libcef.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/swiftshader>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libEGL.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/libGLESv2.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vulkan-1.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/debug/bin/vk_swiftshader_icd.json>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/chrome_elf.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libcef.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/swiftshader>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libEGL.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libGLESv2.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vulkan-1.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader_icd.json>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/chrome_elf.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libcef.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/v8_context_snapshot.bin>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/swiftshader>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/d3dcompiler_47.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libEGL.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/libGLESv2.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vulkan-1.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader.dll>
-    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/../third/cef/release/bin/vk_swiftshader_icd.json>
-    PARENT_SCOPE)
-
+  "${CEF_ROOT}/Resources/locales"
+  "${CEF_ROOT}/Resources/icudtl.dat"
+  "${CEF_ROOT}/Resources/resources.pak"
+  "${CEF_ROOT}/Resources/chrome_100_percent.pak"
+  "${CEF_ROOT}/Resources/chrome_200_percent.pak"
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/chrome_elf.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/libcef.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/v8_context_snapshot.bin>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/d3dcompiler_47.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/libEGL.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/libGLESv2.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/vulkan-1.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/vk_swiftshader.dll>
+  $<$<CONFIG:Debug>:${CEF_ROOT}/Debug/vk_swiftshader_icd.json>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/chrome_elf.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/libcef.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/v8_context_snapshot.bin>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/d3dcompiler_47.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/libEGL.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/libGLESv2.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/vulkan-1.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/vk_swiftshader.dll>
+  $<$<CONFIG:Release>:${CEF_ROOT}/Release/vk_swiftshader_icd.json>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/chrome_elf.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/libcef.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/v8_context_snapshot.bin>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/d3dcompiler_47.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/libEGL.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/libGLESv2.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/vulkan-1.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/vk_swiftshader.dll>
+  $<$<CONFIG:Profile>:${CEF_ROOT}/Release/vk_swiftshader_icd.json>
+  PARENT_SCOPE)

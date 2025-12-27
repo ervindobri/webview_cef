@@ -131,6 +131,11 @@ void WebviewApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 		}
 		command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");     //autoplay policy for media
 
+		// Enable hardware video decoding
+		command_line->AppendSwitch("enable-accelerated-video-decode");
+		command_line->AppendSwitch("enable-gpu-rasterization");
+		command_line->AppendSwitch("ignore-gpu-blocklist");
+
         //Support cross domain requests
         std::string values = command_line->GetSwitchValue("disable-features");
         if (values == "")
