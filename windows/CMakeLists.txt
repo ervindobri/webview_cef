@@ -46,6 +46,11 @@ if(EXISTS "${CEF_LIBCEF_DLL_WRAPPER_PATH}")
     WRAPPING_CEF_SHARED
   )
 
+  # Add /FS flag for synchronous PDB writes (fixes parallel build conflicts)
+  if(MSVC)
+    target_compile_options(libcef_dll_wrapper PRIVATE /FS)
+  endif()
+
   # C++17 standard
   set_target_properties(libcef_dll_wrapper PROPERTIES
     CXX_STANDARD 17

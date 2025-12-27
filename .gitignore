@@ -70,3 +70,6 @@ app.*.map.json
 
 /macos/third/cef/Chromium Embedded Framework.framework
 /macos/third/cef/libcef_dll_wrapper.a
+
+# CEF binaries - downloaded during build (too large for git)
+/third/cef/
